@@ -1,0 +1,8 @@
+.env
+node_modules
+artifacts
+coverage
+build
+.cache
+.cache
+.cache
