@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Logo } from "./logo"
-import { Button } from "./ui/button"
+import { WalletConnectButton } from "./wallet-connect-button"
 import { useState } from "react"
 
 export const Navbar = () => {
@@ -39,7 +39,9 @@ export const Navbar = () => {
         </div>
 
         {/* Connect Wallet Button */}
-        <Button className="hidden md:inline-flex">[Connect Wallet]</Button>
+        <div className="hidden md:inline-flex">
+          <WalletConnectButton />
+        </div>
 
         {/* Mobile Menu Button */}
         <button onClick={() => setIsOpen(!isOpen)} className="md:hidden text-foreground">
@@ -63,7 +65,7 @@ export const Navbar = () => {
                 {link.label}
               </Link>
             ))}
-            <Button className="w-full">[Connect Wallet]</Button>
+            <WalletConnectButton />
           </div>
         </div>
       )}

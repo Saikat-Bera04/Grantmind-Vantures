@@ -1,9 +1,11 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Geist_Mono } from "next/font/google"
+import "@rainbow-me/rainbowkit/styles.css"
 import "./globals.css"
-import { Header } from "@/components/header"
+import { Navbar } from "@/components/navbar"
 import { GL } from "@/components/gl"
+import { Providers } from "@/providers"
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -24,11 +26,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistMono.variable} antialiased`} suppressHydrationWarning>
-        <GL hovering={false} />
-        <div className="relative z-10">
-          <Header />
-          {children}
-        </div>
+        <Providers>
+          <GL hovering={false} />
+          <div className="relative z-10">
+            <Navbar />
+            {children}
+          </div>
+        </Providers>
       </body>
     </html>
   )
