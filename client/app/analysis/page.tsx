@@ -1,11 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
+import { useSearchParams } from 'next/navigation'
 import {
   BarChart,
   Bar,
@@ -19,6 +21,8 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { generatePDF } from "@/lib/pdf-generator"
+import { useRouter } from "next/navigation"
+import { useProposalsStore, type ProposalsState } from "@/store/proposals"
 
 const analysisData = [
   { category: "Market Fit", score: 85 },
@@ -39,6 +43,33 @@ const projectionData = [
 
 export default function Analysis() {
   const [showReport, setShowReport] = useState(false)
+  const [idea, setIdea] = useState("")
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
+  const addProposal = useProposalsStore((s: ProposalsState) => s.addProposal)
+  const search = useSearchParams()
+  const proposalId = search.get('proposalId')
+  const [loadedProposal, setLoadedProposal] = useState<any | null>(null)
+
+  useEffect(() => {
+    const run = async () => {
+      if (!proposalId) return
+      try {
+        setLoading(true)
+        const base = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api'
+        const res = await fetch(`${base}/proposals/${proposalId}`)
+        const data = await res.json()
+        if (!data?.ok) throw new Error(data?.error || 'Failed to load proposal')
+        setLoadedProposal(data.proposal)
+        setShowReport(true)
+      } catch (e) {
+        // no-op: keep default UI
+      } finally {
+        setLoading(false)
+      }
+    }
+    run()
+  }, [proposalId])
 
   const projectData = {
     name: "AI-Powered Grant Matching Platform",
@@ -71,12 +102,59 @@ export default function Analysis() {
                 Submit your project details and our AI will provide comprehensive analysis with market insights, team
                 evaluation, and financial projections.
               </p>
+              <div className="text-left space-y-3 mb-6">
+                <p className="font-mono text-sm text-foreground/60">Paste your complete idea below:</p>
+                <Textarea
+                  value={idea}
+                  onChange={(e) => setIdea(e.target.value)}
+                  rows={6}
+                  placeholder="Describe the idea, goals, target users, tech, budget thoughts, and timeline"
+                  className="border-border"
+                />
+              </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href="/submit">
-                  <Button size="lg">[📝 Submit a Project]</Button>
+                  <Button className="text-base py-3 px-4">[📝 Submit a Project]</Button>
                 </Link>
-                <Button onClick={() => setShowReport(true)} variant="outline" size="lg">
+                <Button onClick={() => setShowReport(true)} className="text-base py-3 px-4 border border-border bg-transparent">
                   [📊 View Sample Report]
+                </Button>
+                <Button
+                  disabled={loading || idea.trim().length < 10}
+                  onClick={async () => {
+                    setLoading(true)
+                    try {
+                      const res = await fetch('/api/analyze-idea', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ idea }),
+                      })
+                      const data = await res.json()
+                      if (!res.ok || !data?.ok) {
+                        throw new Error(data?.error || 'Failed to analyze idea')
+                      }
+                      const built = data.proposal
+                      const proposal = {
+                        title: built.title,
+                        description: built.description,
+                        amount: Number(built.amountSuggestion || 0),
+                        walletAddress: '',
+                        aiSummary: built.aiSummary,
+                        aiScores: built.aiScores,
+                        status: 'submitted' as const,
+                        createdAt: new Date().toISOString(),
+                      }
+                      addProposal(proposal)
+                      alert('Idea analyzed and saved!')
+                      router.push('/voting')
+                    } catch (e: any) {
+                      alert(e.message || 'Failed to analyze idea')
+                    } finally {
+                      setLoading(false)
+                    }
+                  }}
+                >
+                  {loading ? '[Analyzing with AI...]' : '[🤖 Build Proposal with AI]'}
                 </Button>
               </div>
             </Card>
@@ -89,7 +167,7 @@ export default function Analysis() {
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
                   <p className="text-foreground/60 font-mono text-sm mb-1">Overall Score</p>
-                  <p className="text-3xl font-sentient text-primary">82/100</p>
+                  <p className="text-3xl font-sentient text-primary">{loadedProposal?.aiScores?.[0]?.score ?? 82}/100</p>
                 </div>
                 <div>
                   <p className="text-foreground/60 font-mono text-sm mb-1">Recommendation</p>
@@ -97,9 +175,7 @@ export default function Analysis() {
                 </div>
               </div>
               <p className="text-foreground/70 font-mono text-sm leading-relaxed">
-                This project demonstrates strong market potential with an innovative approach. The team shows solid
-                execution capability, and the timeline is realistic. Risk assessment indicates manageable challenges
-                with clear mitigation strategies.
+                {loadedProposal?.aiSummary || 'This project demonstrates strong market potential with an innovative approach. The team shows solid execution capability, and the timeline is realistic. Risk assessment indicates manageable challenges with clear mitigation strategies.'}
               </p>
             </Card>
 
@@ -107,7 +183,7 @@ export default function Analysis() {
             <Card className="p-6">
               <h3 className="text-xl font-sentient mb-6">Evaluation Metrics</h3>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={analysisData}>
+                <BarChart data={loadedProposal?.aiScores || analysisData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,215,0,0.1)" />
                   <XAxis dataKey="category" stroke="rgba(255,255,255,0.5)" angle={-45} textAnchor="end" height={80} />
                   <YAxis stroke="rgba(255,255,255,0.5)" />
@@ -135,10 +211,10 @@ export default function Analysis() {
 
             {/* Download and Back Buttons */}
             <div className="flex gap-4">
-              <Button onClick={handleDownloadPDF} className="flex-1" size="lg">
+              <Button onClick={handleDownloadPDF} className="flex-1 text-base py-3 px-4">
                 [📥 Download PDF Report]
               </Button>
-              <Button onClick={() => setShowReport(false)} variant="outline" className="flex-1" size="lg">
+              <Button onClick={() => setShowReport(false)} className="flex-1 text-base py-3 px-4 border border-border bg-transparent">
                 [← Back]
               </Button>
             </div>

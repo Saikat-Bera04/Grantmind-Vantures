@@ -10,6 +10,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
+import { useAccount } from 'wagmi'
+import { useRouter } from 'next/navigation'
+import { useProposalsStore, type ProposalsState } from '@/store/proposals'
+import { submitProposal } from '@/lib/api'
 
 export default function SubmitPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -19,16 +23,52 @@ export default function SubmitPage() {
     amount: "",
     file: null as File | null,
   })
+  const { address } = useAccount()
+  const router = useRouter()
+  const addProposal = useProposalsStore((s: ProposalsState) => s.addProposal)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    // Simulate submission
-    setTimeout(() => {
-      setIsSubmitting(false)
-      alert("Proposal submitted successfully!")
+    try {
+      const amountNumber = Number(formData.amount)
+      if (!formData.title.trim() || !formData.description.trim() || isNaN(amountNumber)) {
+        throw new Error('Please fill in title, description, and a valid amount')
+      }
+      // Submit to backend for AI analysis + persistence
+      const fd = new FormData()
+      fd.append('title', formData.title.trim())
+      fd.append('description', formData.description.trim())
+      fd.append('amount', String(amountNumber))
+      if (address) fd.append('walletAddress', address)
+      if (formData.file) fd.append('file', formData.file)
+
+      const result = await submitProposal(fd)
+      if (!result?.ok || !result?.proposal) {
+        throw new Error(result?.error || 'Submission failed')
+      }
+      const saved = result.proposal
+      // Mirror to local store so Proposals/Voting show it instantly
+      addProposal({
+        _id: saved._id,
+        title: saved.title,
+        description: saved.description,
+        amount: saved.amount,
+        walletAddress: saved.walletAddress || address || '',
+        aiSummary: saved.aiSummary,
+        aiScores: saved.aiScores,
+        status: saved.status || 'submitted',
+        createdAt: saved.createdAt,
+      })
+
       setFormData({ title: "", description: "", amount: "", file: null })
-    }, 2000)
+      // Redirect to analysis page for detailed AI report of this proposal
+      router.push(`/analysis?proposalId=${saved._id}`)
+    } catch (err: any) {
+      alert(err.message || 'Submission failed')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (

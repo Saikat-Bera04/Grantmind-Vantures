@@ -1,11 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { useProposalsStore, type ProposalItem } from "@/store/proposals"
+import { useAccount, useSendTransaction } from 'wagmi'
+import { parseEther } from 'ethers'
 
 const fundedProjects = [
   {
@@ -17,7 +20,7 @@ const fundedProjects = [
     fundedBy: 234,
     category: "AI/ML",
     status: "Active",
-    image: "🤖",
+    image: "",
   },
   {
     id: 2,
@@ -28,7 +31,7 @@ const fundedProjects = [
     fundedBy: 456,
     category: "Blockchain",
     status: "Active",
-    image: "🗳️",
+    image: "",
   },
   {
     id: 3,
@@ -39,7 +42,7 @@ const fundedProjects = [
     fundedBy: 189,
     category: "Analytics",
     status: "Completed",
-    image: "📊",
+    image: "",
   },
   {
     id: 4,
@@ -50,7 +53,7 @@ const fundedProjects = [
     fundedBy: 312,
     category: "Education",
     status: "Active",
-    image: "📚",
+    image: "",
   },
   {
     id: 5,
@@ -61,7 +64,7 @@ const fundedProjects = [
     fundedBy: 145,
     category: "Impact",
     status: "Active",
-    image: "🌱",
+    image: "",
   },
   {
     id: 6,
@@ -72,24 +75,42 @@ const fundedProjects = [
     fundedBy: 278,
     category: "Developer Tools",
     status: "Active",
-    image: "🛠️",
+    image: "",
   },
 ]
 
 export default function FundedProjects() {
-  const [selectedProject, setSelectedProject] = useState<number | null>(null)
+  const [selectedProject, setSelectedProject] = useState<number | string | null>(null)
   const [fundAmount, setFundAmount] = useState("")
+  const proposalsFromStore = useProposalsStore((s: { proposals: ProposalItem[] }) => s.proposals)
+  const mappedFromStore = useMemo(() => {
+    return (proposalsFromStore || []).map((p, idx) => ({
+      id: p._id || `local-${idx}`,
+      name: p.title,
+      description: p.aiSummary || p.description,
+      fundingGoal: Number(p.amount) || 0,
+      fundingRaised: 0,
+      fundedBy: 0,
+      category: 'AI',
+      status: (p.status || 'submitted') === 'funded' ? 'Completed' : 'Active',
+      image: '',
+    }))
+  }, [proposalsFromStore])
+  const allProjects = [...mappedFromStore, ...fundedProjects]
+  const { isConnected } = useAccount()
+  const { sendTransaction } = useSendTransaction()
+  const DAO_TREASURY = process.env.NEXT_PUBLIC_DAO_ADDRESS || process.env.NEXT_PUBLIC_DAO_TREASURY || ""
 
-  const handleFund = (projectId: number) => {
+  const totalFunded = allProjects.reduce((sum, p) => sum + p.fundingRaised, 0)
+  const totalFunders = allProjects.reduce((sum, p) => sum + p.fundedBy, 0)
+
+  const handleFund = (projectId: number | string) => {
     if (fundAmount && Number.parseFloat(fundAmount) > 0) {
       alert(`Successfully funded $${fundAmount} to project ${projectId}!`)
       setFundAmount("")
       setSelectedProject(null)
     }
   }
-
-  const totalFunded = fundedProjects.reduce((sum, p) => sum + p.fundingRaised, 0)
-  const totalFunders = fundedProjects.reduce((sum, p) => sum + p.fundedBy, 0)
 
   return (
     <main className="min-h-screen">
@@ -124,7 +145,7 @@ export default function FundedProjects() {
 
         {/* Projects Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {fundedProjects.map((project) => {
+          {allProjects.map((project) => {
             const fundingPercentage = (project.fundingRaised / project.fundingGoal) * 100
             const isSelected = selectedProject === project.id
 
@@ -179,14 +200,24 @@ export default function FundedProjects() {
                   <div className="space-y-2">
                     <input
                       type="number"
-                      placeholder="Amount to fund ($)"
+                      step="0.0001"
+                      placeholder="Amount to fund (CELO)"
                       value={fundAmount}
                       onChange={(e) => setFundAmount(e.target.value)}
                       className="w-full px-3 py-2 bg-background border border-border rounded text-sm font-mono focus:outline-none focus:border-primary"
                     />
                     <div className="flex gap-2">
-                      <Button onClick={() => handleFund(project.id)} className="flex-1 text-sm">
-                        [Fund]
+                      <Button
+                        disabled={!isConnected || !DAO_TREASURY || !fundAmount || Number(fundAmount) <= 0}
+                        onClick={() => {
+                          if (!DAO_TREASURY) return
+                          try {
+                            sendTransaction({ to: DAO_TREASURY as `0x${string}`, value: parseEther(fundAmount) })
+                          } catch {}
+                        }}
+                        className="flex-1 text-sm"
+                      >
+                        {isConnected ? '[Fund]' : '[Connect Wallet]'}
                       </Button>
                       <Button onClick={() => setSelectedProject(null)} variant="outline" className="flex-1 text-sm">
                         [Cancel]

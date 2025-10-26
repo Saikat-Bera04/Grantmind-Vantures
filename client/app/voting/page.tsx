@@ -6,14 +6,15 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import { useProposalsStore, type ProposalItem, type ProposalsState } from "@/store/proposals"
 
 export default function VotingPage() {
   const [userVotes, setUserVotes] = useState<{ [key: number]: string }>({})
   const [votingPower] = useState(100)
   const [userVotingPower] = useState(100)
 
-  const activeProposals = [
+  const sampleProposals = [
     {
       id: 1,
       title: "AI-Powered Analytics Platform",
@@ -82,6 +83,33 @@ export default function VotingPage() {
       category: "Sustainability",
     },
   ]
+
+  const proposalsFromStore = useProposalsStore((s: { proposals: ProposalItem[] }) => s.proposals)
+  const markStatus = useProposalsStore((s: ProposalsState) => s.markStatus)
+  // Map store proposals into the UI shape the page expects
+  const activeProposals = useMemo(() => {
+    const mapped = (proposalsFromStore || []).map((p: ProposalItem, idx: number) => ({
+      id: idx + 1000,
+      sourceId: p._id || String(idx + 1000),
+      isLocal: true,
+      status: p.status || 'submitted',
+      title: p.title,
+      description: p.aiSummary || p.description,
+      creator: p.walletAddress || "",
+      creatorName: p.walletAddress ? p.walletAddress.slice(0, 6) + "..." + p.walletAddress.slice(-4) : "",
+      startDate: new Date(p.createdAt || Date.now()).toISOString().slice(0, 10),
+      endDate: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+      votesFor: 0,
+      votesAgainst: 0,
+      votesAbstain: 0,
+      totalVotes: 0,
+      requiredQuorum: 50,
+      fundingAmount: p.amount,
+      category: "AI",
+      aiScores: p.aiScores || [],
+    }))
+    return [...mapped, ...sampleProposals]
+  }, [proposalsFromStore])
 
   const votingHistory = [
     { id: 101, title: "NFT Marketplace Integration", vote: "For", date: "2024-01-10", status: "Passed" },
@@ -262,6 +290,14 @@ export default function VotingPage() {
                     >
                       {userVote === "Abstain" ? "✓ Abstained" : "Abstain"}
                     </Button>
+                    {('isLocal' in proposal) && (proposal as any).isLocal && (proposal as any).status !== 'funded' && (
+                      <Button
+                        onClick={() => markStatus((proposal as any).sourceId as string, 'funded')}
+                        className="flex-1 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
+                      >
+                        Mark as Funded
+                      </Button>
+                    )}
                   </div>
                 </Card>
               )

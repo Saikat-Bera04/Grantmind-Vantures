@@ -6,59 +6,16 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import { useProposalsStore, type ProposalItem } from "@/store/proposals"
 
 export default function ProposalsPage() {
   const [filter, setFilter] = useState("all")
-
-  const proposals = [
-    {
-      id: 1,
-      title: "AI-Powered Analytics Platform",
-      creator: "0x1234...5678",
-      aiScore: 92,
-      status: "pending",
-      votes: 45,
-      totalVotes: 100,
-      amount: 50000,
-      description: "A comprehensive analytics platform powered by AI",
-    },
-    {
-      id: 2,
-      title: "DeFi Yield Optimizer",
-      creator: "0x8765...4321",
-      aiScore: 87,
-      status: "approved",
-      votes: 78,
-      totalVotes: 100,
-      amount: 75000,
-      description: "Optimize DeFi yields with machine learning",
-    },
-    {
-      id: 3,
-      title: "Web3 Education Hub",
-      creator: "0x5555...6666",
-      aiScore: 79,
-      status: "pending",
-      votes: 32,
-      totalVotes: 100,
-      amount: 30000,
-      description: "Interactive learning platform for Web3 developers",
-    },
-    {
-      id: 4,
-      title: "Carbon Credit Marketplace",
-      creator: "0x9999...0000",
-      aiScore: 95,
-      status: "funded",
-      votes: 95,
-      totalVotes: 100,
-      amount: 100000,
-      description: "Transparent carbon credit trading on blockchain",
-    },
-  ]
-
-  const filteredProposals = filter === "all" ? proposals : proposals.filter((p) => p.status === filter)
+  const proposals = useProposalsStore((s: { proposals: ProposalItem[] }) => s.proposals)
+  const filteredProposals = useMemo(() => {
+    if (filter === 'all') return proposals
+    return (proposals || []).filter((p) => (p.status || 'submitted') === filter)
+  }, [proposals, filter])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -85,7 +42,7 @@ export default function ProposalsPage() {
 
         {/* Filters */}
         <div className="flex gap-3 mb-12 flex-wrap">
-          {["all", "pending", "approved", "funded"].map((f) => (
+          {["all", "submitted", "approved", "funded"].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -102,15 +59,18 @@ export default function ProposalsPage() {
 
         {/* Proposals Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {filteredProposals.length === 0 && (
+            <p className="font-mono text-sm text-foreground/60">No proposals yet. Try adding one from Analysis or Submit pages.</p>
+          )}
           {filteredProposals.map((proposal) => (
-            <Link key={proposal.id} href={`/proposal/${proposal.id}`}>
+            <Link key={proposal._id} href={`/proposal/${proposal._id}`}>
               <Card className="p-6 border border-border hover:border-primary/50 transition-all cursor-pointer h-full">
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="font-sentient text-xl flex-1">{proposal.title}</h3>
-                  <Badge className={getStatusColor(proposal.status)}>{proposal.status}</Badge>
+                  <Badge className={getStatusColor(proposal.status || 'submitted')}>{proposal.status || 'submitted'}</Badge>
                 </div>
 
-                <p className="font-mono text-sm text-foreground/60 mb-4">by {proposal.creator}</p>
+                <p className="font-mono text-sm text-foreground/60 mb-4">by {proposal.walletAddress || 'N/A'}</p>
 
                 <p className="font-mono text-sm text-foreground/70 mb-6">{proposal.description}</p>
 
@@ -119,26 +79,24 @@ export default function ProposalsPage() {
                   <div>
                     <div className="flex justify-between mb-2">
                       <span className="font-mono text-xs text-foreground/60">AI Score</span>
-                      <span className="font-mono text-sm text-primary">{proposal.aiScore}%</span>
+                      <span className="font-mono text-sm text-primary">{(proposal.aiScores?.[0]?.score ?? 0)}%</span>
                     </div>
-                    <Progress value={proposal.aiScore} className="h-2" />
+                    <Progress value={(proposal.aiScores?.[0]?.score ?? 0)} className="h-2" />
                   </div>
 
-                  {/* Votes */}
+                  {/* Placeholder for votes until wired to on-chain */}
                   <div>
                     <div className="flex justify-between mb-2">
                       <span className="font-mono text-xs text-foreground/60">Votes</span>
-                      <span className="font-mono text-sm">
-                        {proposal.votes}/{proposal.totalVotes}
-                      </span>
+                      <span className="font-mono text-sm">N/A</span>
                     </div>
-                    <Progress value={(proposal.votes / proposal.totalVotes) * 100} className="h-2" />
+                    <Progress value={0} className="h-2" />
                   </div>
 
                   {/* Amount */}
                   <div className="flex justify-between pt-2 border-t border-border">
                     <span className="font-mono text-xs text-foreground/60">Requested</span>
-                    <span className="font-mono text-sm text-primary">{proposal.amount.toLocaleString()} CELO</span>
+                    <span className="font-mono text-sm text-primary">{Number(proposal.amount).toLocaleString()} CELO</span>
                   </div>
                 </div>
               </Card>
