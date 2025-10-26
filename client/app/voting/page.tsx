@@ -8,11 +8,15 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { useMemo, useState } from "react"
 import { useProposalsStore, type ProposalItem, type ProposalsState } from "@/store/proposals"
+import { useAccount, useSendTransaction } from 'wagmi'
+import { parseEther } from 'viem'
 
 export default function VotingPage() {
   const [userVotes, setUserVotes] = useState<{ [key: number]: string }>({})
   const [votingPower] = useState(100)
   const [userVotingPower] = useState(100)
+  const { isConnected } = useAccount()
+  const { sendTransaction } = useSendTransaction()
 
   const sampleProposals = [
     {
@@ -259,7 +263,7 @@ export default function VotingPage() {
                   </div>
 
                   {/* Voting Buttons */}
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 flex-wrap">
                     <Button
                       onClick={() => handleVote(proposal.id, "For")}
                       className={`flex-1 ${
@@ -290,6 +294,25 @@ export default function VotingPage() {
                     >
                       {userVote === "Abstain" ? "✓ Abstained" : "Abstain"}
                     </Button>
+                    {('isLocal' in proposal) && (proposal as any).isLocal && (proposal as any).creator && (
+                      <Button
+                        onClick={() => {
+                          const to = String((proposal as any).creator)
+                          if (!to || !to.startsWith('0x') || to.length < 42) return
+                          const amount = prompt('Enter donation amount in CELO:') || ''
+                          if (!amount || Number(amount) <= 0) return
+                          try {
+                            sendTransaction({ to: to as `0x${string}`, value: parseEther(amount) })
+                          } catch (e) {
+                            // wallet will surface errors
+                          }
+                        }}
+                        className="flex-1 bg-primary/10 text-primary hover:bg-primary/20"
+                        disabled={!isConnected}
+                      >
+                        {isConnected ? 'Donate' : 'Connect Wallet to Donate'}
+                      </Button>
+                    )}
                     {('isLocal' in proposal) && (proposal as any).isLocal && (proposal as any).status !== 'funded' && (
                       <Button
                         onClick={() => markStatus((proposal as any).sourceId as string, 'funded')}

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useProposalsStore, type ProposalItem } from "@/store/proposals"
 import { useAccount, useSendTransaction } from 'wagmi'
-import { parseEther } from 'ethers'
+import { parseEther } from 'viem'
 
 const fundedProjects = [
   {

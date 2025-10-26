@@ -56,8 +56,10 @@ export default function Analysis() {
       if (!proposalId) return
       try {
         setLoading(true)
-        const base = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api'
-        const res = await fetch(`${base}/proposals/${proposalId}`)
+        const forceExternal = process.env.NEXT_PUBLIC_FORCE_EXTERNAL_API === 'true'
+        const base = forceExternal ? (process.env.NEXT_PUBLIC_API_BASE_URL || '') : ''
+        const url = base ? `${base}/proposals/${proposalId}` : `/api/proposals/${proposalId}`
+        const res = await fetch(url)
         const data = await res.json()
         if (!data?.ok) throw new Error(data?.error || 'Failed to load proposal')
         setLoadedProposal(data.proposal)

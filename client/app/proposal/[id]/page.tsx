@@ -17,6 +17,7 @@ export default function ProposalDetailPage({ params }: { params: { id: string } 
   const [error, setError] = useState<string | null>(null)
   const [proposal, setProposal] = useState<any | null>(null)
   const [fundAmount, setFundAmount] = useState("") // CELO amount as string
+  const [donationAmount, setDonationAmount] = useState("") // CELO donation amount
   const { address, isConnected } = useAccount()
   const { sendTransaction } = useSendTransaction()
   const DAO_TREASURY = process.env.NEXT_PUBLIC_DAO_ADDRESS || process.env.NEXT_PUBLIC_DAO_TREASURY || ""
@@ -25,8 +26,10 @@ export default function ProposalDetailPage({ params }: { params: { id: string } 
     const load = async () => {
       try {
         setLoading(true)
-        // Reuse list API for simplicity; in real app add getProposal(id)
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api'}/proposals/${params.id}`)
+        // Use Next.js local API while backend is inactive
+        const base = process.env.NEXT_PUBLIC_API_BASE_URL
+        const url = base ? `${base}/proposals/${params.id}` : `/api/proposals/${params.id}`
+        const res = await fetch(url)
         const data = await res.json()
         if (!data.ok) throw new Error(data.error || 'Failed to load')
         setProposal(data.proposal)
@@ -205,6 +208,45 @@ export default function ProposalDetailPage({ params }: { params: { id: string } 
                   >
                     {isConnected ? '[💰 Fund with CELO]' : '[Connect Wallet to Fund]'}
                   </Button>
+                </div>
+              </Card>
+
+              {/* Donate Directly to Creator */}
+              <Card className="p-6 border border-border">
+                <h3 className="font-sentient text-lg mb-4">Donate to Creator</h3>
+                <div className="space-y-3">
+                  {!proposal?.walletAddress ? (
+                    <p className="font-mono text-xs text-foreground/60">Creator wallet is not available.</p>
+                  ) : (
+                    <>
+                      <div className="text-sm font-mono text-foreground/60">
+                        Creator Wallet: <span className="text-foreground">{proposal.walletAddress}</span>
+                      </div>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        placeholder="Amount in CELO"
+                        value={donationAmount}
+                        onChange={(e) => setDonationAmount(e.target.value)}
+                        className="w-full px-3 py-2 bg-background border border-border rounded text-sm font-mono focus:outline-none focus:border-primary"
+                      />
+                      <Button
+                        disabled={!isConnected || !donationAmount || Number(donationAmount) <= 0}
+                        onClick={() => {
+                          const to = String(proposal.walletAddress || '') as `0x${string}`
+                          if (!to || !to.startsWith('0x') || to.length < 42) return
+                          try {
+                            sendTransaction({ to, value: parseEther(donationAmount) })
+                          } catch (e) {
+                            // wallet will surface errors
+                          }
+                        }}
+                        className="w-full"
+                      >
+                        {isConnected ? '[🎁 Donate to Creator]' : '[Connect Wallet to Donate]'}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </Card>
             </div>
