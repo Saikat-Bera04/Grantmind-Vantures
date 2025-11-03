@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   title: "Grantmind Ventures",
   description: "Investment strategies that outperform the market",
   generator: "v0.app",
+  icons: {
+    icon: "/grantmind-logo.png",
+    apple: "/grantmind-logo.png",
+  },
 }
 
 export default function RootLayout({
